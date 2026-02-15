@@ -1,0 +1,648 @@
+駄菓子屋シミュレーション（制作:understand）
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <title>駄菓子屋経営ゲーム - 拡張版</title>
+  <style>
+    body {
+      font-family: "Yu Gothic", sans-serif;
+      background: #fff7e0;
+      margin: 0;
+      padding: 0;
+    }
+    .hidden { display: none; }
+    #gameLayout {
+      display: flex;
+      height: 100vh;
+    }
+    #leftArea {
+      flex: 2;
+      padding: 20px;
+      overflow-y: auto;
+    }
+    #rightArea {
+      flex: 1;
+      padding: 20px;
+      border-left: 2px solid #d0c090;
+      background: #fffaf0;
+      overflow-y: auto;
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+    }
+    .panel {
+      background: #ffffff;
+      border-radius: 8px;
+      padding: 12px 16px;
+      margin-bottom: 12px;
+      box-shadow: 0 2px 4px rgba(0,0,0,0.08);
+    }
+    .itemRow {
+      display: flex;
+      align-items: flex-start;
+      border: 1px solid #ddd;
+      border-radius: 6px;
+      padding: 8px;
+      background: #fffdf5;
+      margin-bottom: 8px;
+    }
+    .itemInfo {
+      flex: 1;
+    }
+    .itemButtons {
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+      margin-left: 8px;
+    }
+    button {
+      cursor: pointer;
+      padding: 4px 8px;
+      border-radius: 4px;
+      border: 1px solid #888;
+      background: #ffe28a;
+    }
+    button:disabled {
+      background: #ddd;
+      cursor: not-allowed;
+    }
+    #log {
+      white-space: pre-line;
+      font-size: 0.9rem;
+      max-height: 50vh;
+      overflow-y: auto;
+    }
+    #titleScreen {
+      padding: 40px;
+      text-align: center;
+    }
+    #speedButtons button {
+      margin-right: 4px;
+    }
+    canvas {
+      background: #fff;
+      border-radius: 6px;
+      border: 1px solid #ccc;
+    }
+  </style>
+</head>
+<body>
+<!-- タイトル画面 -->
+<div id="titleScreen">
+  <h1>駄菓子屋経営ゲーム</h1>
+  <p>小さな駄菓子屋から、町一番の人気店を目指そう。</p>
+  <button id="startBtn" style="font-size:20px; padding:10px 20px;">ゲームスタート</button>
+</div>
+<!-- ゲーム画面 -->
+<div id="gameScreen" class="hidden">
+  <div id="gameLayout">
+    <!-- 左側 -->
+    <div id="leftArea">
+      <div class="panel">
+        <div>日数: <span id="day">1</span> 日目</div>
+        <div>季節: <span id="season">春</span></div>
+        <div>天気: <span id="weather">晴れ</span></div>
+        <div>時刻: <span id="time">9:00</span></div>
+        <div>所持金: <span id="money">1000</span> 円</div>
+        <div>評判: <span id="reputation">50.0</span> %</div>
+        <div>棚レベル: <span id="shelfLevel">1</span></div>
+        <div>バイト人数: <span id="staffCount">0</span> 人</div>
+        <div>人気商品: <span id="popularItemLabel">なし</span></div>
+        <div>SALE状態: <span id="saleStatus">なし</span></div>
+        <div id="speedButtons" style="margin-top:8px;">
+          <span>速度:</span>
+          <button data-speed="normal">通常</button>
+          <button data-speed="fast">倍速</button>
+          <button id="skipDayBtn">1日スキップ</button>
+        </div>
+        <button id="nextDayBtn" style="margin-top:8px;">次の日を始める</button>
+      </div>
+      <div class="panel">
+        <h2>仕入れ（営業中は不可）</h2>
+        <div id="itemsContainer"></div>
+      </div>
+      <div class="panel">
+        <h2>在庫状況</h2>
+        <ul id="stockList"></ul>
+      </div>
+      <div class="panel">
+        <h2>ショップ</h2>
+        <p>設備やキャンペーンを購入して、店を成長させよう。</p>
+        <button id="buyShelfBtn">棚を増設（500円）</button><br><br>
+        <button id="unlockCandyBtn">新しい駄菓子を解放（800円）</button><br><br>
+        <button id="hireStaffBtn">バイトを雇う（1人 600円）</button><br><br>
+        <button id="startSaleBtn">SALEを開始する</button><br><br>
+        <button id="investBtn" disabled>投資プロジェクト（3000円）</button>
+        <div style="font-size:0.85rem; margin-top:4px;">
+          ※投資は評判が一度90％を超えると解放され、その後は評判に関係なく実行可能
+        </div>
+      </div>
+    </div>
+    <!-- 右側 -->
+    <div id="rightArea">
+      <div class="panel">
+        <h2>ログ</h2>
+        <div id="log"></div>
+      </div>
+      <div class="panel">
+        <h2>売上グラフ（日ごと）</h2>
+        <canvas id="salesChart" width="300" height="200"></canvas>
+      </div>
+    </div>
+  </div>
+</div>
+<script>
+  // --- ゲームデータ ---
+  let items = [
+    { id: 1, name: "うまい棒", buyPrice: 8, sellPrice: 10, baseSellPrice: 10, stock: 10, maxStock: 30 },
+    { id: 2, name: "ラムネ", buyPrice: 15, sellPrice: 20, baseSellPrice: 20, stock: 5, maxStock: 20 },
+    { id: 3, name: "ベビースター", buyPrice: 25, sellPrice: 35, baseSellPrice: 35, stock: 3, maxStock: 15 }
+  ];
+  const unlockableItems = [
+    { id: 4, name: "チョコバット", buyPrice: 20, sellPrice: 30, baseSellPrice: 30, stock: 0, maxStock: 20 },
+    { id: 5, name: "キャベツ太郎", buyPrice: 18, sellPrice: 28, baseSellPrice: 28, stock: 0, maxStock: 20 },
+    { id: 6, name: "ヨーグル", buyPrice: 12, sellPrice: 18, baseSellPrice: 18, stock: 0, maxStock: 20 }
+  ];
+  let day = 1;
+  let money = 1000;
+  let reputation = 50.0; // 0〜100%
+  let shelfLevel = 1;
+  let staffCount = 0;
+  let currentTime = 9 * 60;
+  let isOpen = false;
+  let timer = null;
+  let seasonIndex = 0; // 0:春,1:夏,2:秋,3:冬
+  const seasons = ["春", "夏", "秋", "冬"];
+  let weather = "晴れ";
+  const weathers = ["晴れ", "曇り", "雨", "雪"];
+  // 人気商品
+  let popularItemId = null;
+  let yesterdaySalesCount = {}; // { itemId: soldCount }
+  // SALE
+  let isSale = false;
+  let saleDaysLeft = 0;
+  // 投資
+  let investmentUnlocked = false;
+  let investmentLevel = 0;
+  // 売上グラフ用
+  let dailySalesHistory = []; // 各日の売上
+  // スピード
+  let tickDuration = 500; // ms
+  const SPEEDS = {
+    normal: 500,
+    fast: 200
+  };
+  // DOM
+  const dayEl = document.getElementById("day");
+  const timeEl = document.getElementById("time");
+  const moneyEl = document.getElementById("money");
+  const reputationEl = document.getElementById("reputation");
+  const shelfLevelEl = document.getElementById("shelfLevel");
+  const staffCountEl = document.getElementById("staffCount");
+  const itemsContainer = document.getElementById("itemsContainer");
+  const stockList = document.getElementById("stockList");
+  const logEl = document.getElementById("log");
+  const seasonEl = document.getElementById("season");
+  const weatherEl = document.getElementById("weather");
+  const popularItemLabelEl = document.getElementById("popularItemLabel");
+  const saleStatusEl = document.getElementById("saleStatus");
+  const investBtn = document.getElementById("investBtn");
+  const salesCanvas = document.getElementById("salesChart");
+  const salesCtx = salesCanvas.getContext("2d");
+  // タイトル画面
+  document.getElementById("startBtn").addEventListener("click", () => {
+    document.getElementById("titleScreen").classList.add("hidden");
+    document.getElementById("gameScreen").classList.remove("hidden");
+    init();
+  });
+  // UI
+  function renderItems() {
+    itemsContainer.innerHTML = "";
+    items.forEach(item => {
+      const row = document.createElement("div");
+      row.className = "itemRow";
+      const info = document.createElement("div");
+      info.className = "itemInfo";
+      info.innerHTML = `
+        <strong>${item.name}</strong><br>
+        仕入れ: ${item.buyPrice} 円 / 売価: ${item.sellPrice} 円<br>
+        在庫: <span id="stock-${item.id}">${item.stock}</span> / ${item.maxStock}
+      `;
+      const btns = document.createElement("div");
+      btns.className = "itemButtons";
+      const b1 = document.createElement("button");
+      b1.textContent = "+1";
+      b1.dataset.id = item.id;
+      b1.dataset.qty = 1;
+      const b10 = document.createElement("button");
+      b10.textContent = "+10";
+      b10.dataset.id = item.id;
+      b10.dataset.qty = 10;
+      btns.appendChild(b1);
+      btns.appendChild(b10);
+      row.appendChild(info);
+      row.appendChild(btns);
+      itemsContainer.appendChild(row);
+    });
+    itemsContainer.querySelectorAll("button").forEach(btn => {
+      btn.addEventListener("click", () => {
+        if (isOpen) return;
+        buyStock(Number(btn.dataset.id), Number(btn.dataset.qty));
+      });
+    });
+  }
+  function renderStock() {
+    stockList.innerHTML = "";
+    items.forEach(item => {
+      const li = document.createElement("li");
+      li.textContent = `${item.name}: ${item.stock} / ${item.maxStock}`;
+      stockList.appendChild(li);
+    });
+  }
+  function updateStats() {
+    dayEl.textContent = day;
+    moneyEl.textContent = money;
+    reputationEl.textContent = reputation.toFixed(1);
+    shelfLevelEl.textContent = shelfLevel;
+    staffCountEl.textContent = staffCount;
+    seasonEl.textContent = seasons[seasonIndex];
+    weatherEl.textContent = weather;
+    saleStatusEl.textContent = isSale ? `SALE中（残り${saleDaysLeft}日）` : "なし";
+    const popularItem = items.find(i => i.id === popularItemId);
+    popularItemLabelEl.textContent = popularItem ? popularItem.name : "なし";
+    if (reputation >= 90 && !investmentUnlocked) {
+      investmentUnlocked = true;
+      log("評判が高まり、投資の話が舞い込んできた！投資プロジェクトが解放された。");
+    }
+    investBtn.disabled = !investmentUnlocked;
+    items.forEach(item => {
+      const el = document.getElementById(`stock-${item.id}`);
+      if (el) el.textContent = item.stock;
+    });
+  }
+  function log(msg) {
+    logEl.textContent = `${msg}\n` + logEl.textContent;
+  }
+  // 仕入れ
+  function buyStock(id, qty) {
+    const item = items.find(i => i.id === id);
+    const cost = item.buyPrice * qty;
+    if (money < cost) {
+      log(`お金が足りない…`);
+      return;
+    }
+    if (item.stock + qty > item.maxStock) {
+      log(`これ以上 ${item.name} の在庫を置けない…（棚を増設しよう）`);
+      return;
+    }
+    money -= cost;
+    item.stock += qty;
+    log(`${item.name} を ${qty} 個仕入れた（-${cost}円）`);
+    updateStats();
+    renderStock();
+  }
+  // 営業開始
+  function startDay(realTime = true) {
+    isOpen = true;
+    currentTime = 9 * 60;
+    yesterdaySalesCount = {};
+    decideWeather();
+    applySalePrices();
+    let todaySales = 0;
+    log(`=== ${day}日目の営業を開始 ===`);
+    log(`季節: ${seasons[seasonIndex]} / 天気: ${weather}`);
+    if (popularItemId) {
+      const popularItem = items.find(i => i.id === popularItemId);
+      if (popularItem) {
+        log(`今日は ${popularItem.name} が人気商品だ！`);
+      }
+    }
+    disableBuying(true);
+    const tick = () => {
+      currentTime += 10;
+      updateTimeDisplay();
+      if (currentTime === 15 * 60) {
+        log("学校帰りの子供たちが増えてきた！");
+      }
+      randomEvents();
+      todaySales += customerAction();
+      if (currentTime >= 18 * 60) {
+        endDay(todaySales);
+      } else if (realTime) {
+        timer = setTimeout(tick, tickDuration);
+      } else {
+        // スキップモードならループで一気に回す
+        tick();
+      }
+    };
+    if (realTime) {
+      timer = setTimeout(tick, tickDuration);
+    } else {
+      tick();
+    }
+  }
+  function updateTimeDisplay() {
+    const h = Math.floor(currentTime / 60);
+    const m = currentTime % 60;
+    timeEl.textContent = `${h}:${m.toString().padStart(2, "0")}`;
+  }
+  // 天気決定
+  function decideWeather() {
+    const r = Math.random();
+    if (r < 0.5) weather = "晴れ";
+    else if (r < 0.75) weather = "曇り";
+    else if (r < 0.9) weather = "雨";
+    else weather = "雪";
+  }
+  // 客の行動（売上を返す）
+  function customerAction() {
+    let baseChance = 0.3 + (reputation / 100) * 0.4;
+    // バイト補正（バイトが多いほど客が来やすい）
+    baseChance += staffCount * 0.05;
+    // 時間帯補正（学校帰り）
+    if (currentTime >= 15 * 60 && currentTime <= 17 * 60) {
+      baseChance += 0.3;
+    }
+    // 天気補正
+    if (weather === "曇り") baseChance *= 0.9;
+    if (weather === "雨") baseChance *= 0.7;
+    if (weather === "雪") baseChance *= 0.6;
+    // 季節補正
+    const season = seasons[seasonIndex];
+    if (season === "春") baseChance *= 1.05;
+    if (season === "夏") baseChance *= 1.15;
+    if (season === "冬") baseChance *= 0.9;
+    // 投資レベル補正（客数アップ）
+    baseChance *= (1 + investmentLevel * 0.05);
+    // SALE補正
+    if (isSale) baseChance *= 1.4;
+    if (Math.random() > baseChance) return 0;
+    const available = items.filter(i => i.stock > 0);
+    if (available.length === 0) {
+      log(`お客さん「売り切れかぁ…」`);
+      // 売り切れペナルティ：評判をどんどん減らす
+      reputation = Math.max(0, reputation - 0.5);
+      updateStats();
+      return 0;
+    }
+    let pool = [];
+    available.forEach(item => {
+      let weight = 1;
+      if (item.id === popularItemId) {
+        weight += 2;
+        if (isSale) weight += 1;
+      }
+      for (let i = 0; i < weight; i++) pool.push(item);
+    });
+    const item = pool[Math.floor(Math.random() * pool.length)];
+    item.stock--;
+    money += item.sellPrice;
+    if (!yesterdaySalesCount[item.id]) yesterdaySalesCount[item.id] = 0;
+    yesterdaySalesCount[item.id]++;
+    log(`お客さんが ${item.name} を1個買った！（+${item.sellPrice}円）`);
+    updateStats();
+    renderStock();
+    return item.sellPrice;
+  }
+  // 営業終了
+  function endDay(todaySales) {
+    if (timer) clearTimeout(timer);
+    isOpen = false;
+    disableBuying(false);
+    log(`=== ${day}日目の営業終了（売上: ${todaySales}円） ===`);
+    dailySalesHistory.push(todaySales);
+    drawSalesChart();
+    // 人気商品が売り切れていたらペナルティ
+    if (popularItemId) {
+      const popularItem = items.find(i => i.id === popularItemId);
+      if (popularItem && popularItem.stock === 0) {
+        reputation = Math.max(0, reputation - 2);
+        log(`人気商品の ${popularItem.name} が売り切れでお客さんががっかりしている…（評判 -2%）`);
+      }
+    }
+    // 今日一番売れた商品を人気商品に
+    let bestId = null;
+    let bestCount = 0;
+    for (const id in yesterdaySalesCount) {
+      if (yesterdaySalesCount[id] > bestCount) {
+        bestCount = yesterdaySalesCount[id];
+        bestId = Number(id);
+      }
+    }
+    popularItemId = bestId;
+    // SALE日数処理
+    if (isSale) {
+      saleDaysLeft--;
+      if (saleDaysLeft <= 0) {
+        endSale();
+      }
+    }
+    // 電気代（7日に1回）
+    if (day % 7 === 0) {
+      const cost = 300 + staffCount * 100 + investmentLevel * 150;
+      money -= cost;
+      log(`電気代や人件費などの固定費として ${cost} 円支払った。`);
+    }
+    // 季節変化（30日ごと）
+    if (day % 30 === 0) {
+      seasonIndex = (seasonIndex + 1) % seasons.length;
+      log(`季節が ${seasons[seasonIndex]} になった。`);
+    }
+    updateStats();
+    day++;
+  }
+  function disableBuying(flag) {
+    itemsContainer.querySelectorAll("button").forEach(btn => {
+      btn.disabled = flag;
+    });
+  }
+  // ショップ機能
+  document.getElementById("buyShelfBtn").addEventListener("click", () => {
+    if (money < 500) {
+      log("お金が足りない…");
+      return;
+    }
+    money -= 500;
+    shelfLevel++;
+    items.forEach(i => i.maxStock += 10);
+    log("棚を増設した！在庫上限が増えた！");
+    updateStats();
+    renderItems();
+    renderStock();
+  });
+  document.getElementById("unlockCandyBtn").addEventListener("click", () => {
+    if (unlockableItems.length === 0) {
+      log("もう解放できる駄菓子はない！");
+      return;
+    }
+    if (money < 800) {
+      log("お金が足りない…");
+      return;
+    }
+    money -= 800;
+    const newItem = unlockableItems.shift();
+    items.push(newItem);
+    log(`${newItem.name} が新しく仕入れ可能になった！`);
+    renderItems();
+    renderStock();
+    updateStats();
+  });
+  document.getElementById("hireStaffBtn").addEventListener("click", () => {
+    if (money < 600) {
+      log("お金が足りない…");
+      return;
+    }
+    money -= 600;
+    staffCount++;
+    log(`バイトを1人雇った！（合計 ${staffCount} 人）`);
+    updateStats();
+  });
+  // SALE機能
+  document.getElementById("startSaleBtn").addEventListener("click", () => {
+    if (isSale) {
+      log("すでにSALE中だ。");
+      return;
+    }
+    const days = prompt("SALE期間（日数）を入力してください（1〜5）", "3");
+    if (days === null) return;
+    const d = Number(days);
+    if (!Number.isInteger(d) || d < 1 || d > 5) {
+      log("1〜5の整数で入力してね。");
+      return;
+    }
+    isSale = true;
+    saleDaysLeft = d;
+    log(`SALEを開始した！（期間: ${d}日） 売価20%OFF＆客数アップ！`);
+    updateStats();
+  });
+  function applySalePrices() {
+    items.forEach(item => {
+      item.sellPrice = item.baseSellPrice;
+      if (isSale) {
+        item.sellPrice = Math.floor(item.baseSellPrice * 0.8);
+      }
+    });
+  }
+  function endSale() {
+    isSale = false;
+    saleDaysLeft = 0;
+    items.forEach(item => {
+      item.sellPrice = item.baseSellPrice;
+    });
+    reputation = Math.min(100, reputation + 5);
+    log("SALEが終了した。評判が少し上がった！（+5%）");
+  }
+  // 投資
+  investBtn.addEventListener("click", () => {
+    if (!investmentUnlocked) {
+      log("まだ投資は解放されていない。");
+      return;
+    }
+    if (money < 3000) {
+      log("投資をするにはお金が足りない…");
+      return;
+    }
+    money -= 3000;
+    investmentLevel++;
+    log(`投資プロジェクトを実行した！店の知名度と安定感が増した。（投資レベル ${investmentLevel}）`);
+    reputation = Math.min(100, reputation + 5);
+    updateStats();
+  });
+  // ランダムイベント＆季節イベント
+  function randomEvents() {
+    // 通常ランダムイベント
+    if (Math.random() < 0.1) {
+      const events = [
+        () => {
+          log("子供会が大量に買いに来た！客が一時的に増えそうだ。");
+          reputation = Math.min(100, reputation + 3);
+        },
+        () => {
+          log("近所のスーパーが駄菓子セールを始めた…客足が少し遠のきそうだ。");
+          reputation = Math.max(0, reputation - 3);
+        },
+        () => {
+          log("テレビで駄菓子特集が放送された！店の評判が上がった！");
+          reputation = Math.min(100, reputation + 8);
+        },
+        () => {
+          log("店の前で猫が寝ていて、なんだか癒された。ほんの少し評判が上がった。");
+          reputation = Math.min(100, reputation + 2);
+        }
+      ];
+      const ev = events[Math.floor(Math.random() * events.length)];
+      ev();
+      updateStats();
+    }
+    // 季節イベント
+    const season = seasons[seasonIndex];
+    if (Math.random() < 0.05) {
+      if (season === "夏") {
+        log("近所で夏祭りが開催されている！子供たちがたくさんやってきた！");
+        reputation = Math.min(100, reputation + 5);
+      } else if (season === "冬") {
+        log("クリスマスシーズンで、ちょっとしたプレゼント需要が増えている！");
+        reputation = Math.min(100, reputation + 4);
+      } else if (season === "秋") {
+        log("ハロウィンでお菓子を配る人が増えているようだ。駄菓子の需要が上がっている！");
+        reputation = Math.min(100, reputation + 4);
+      } else if (season === "春") {
+        log("新学期で子供たちが増えた！新しい常連さんができるかも。");
+        reputation = Math.min(100, reputation + 3);
+      }
+      updateStats();
+    }
+  }
+  // 売上グラフ描画
+  function drawSalesChart() {
+    const ctx = salesCtx;
+    const w = salesCanvas.width;
+    const h = salesCanvas.height;
+    ctx.clearRect(0, 0, w, h);
+    if (dailySalesHistory.length === 0) return;
+    const maxSales = Math.max(...dailySalesHistory, 1);
+    const barWidth = Math.max(10, (w - 20) / dailySalesHistory.length - 4);
+    ctx.strokeStyle = "#333";
+    ctx.beginPath();
+    ctx.moveTo(10, 10);
+    ctx.lineTo(10, h - 20);
+    ctx.lineTo(w - 10, h - 20);
+    ctx.stroke();
+    dailySalesHistory.forEach((v, i) => {
+      const x = 15 + i * (barWidth + 4);
+      const barHeight = (v / maxSales) * (h - 40);
+      const y = h - 20 - barHeight;
+      ctx.fillStyle = "#ffb347";
+      ctx.fillRect(x, y, barWidth, barHeight);
+    });
+  }
+  // スピード変更
+  document.querySelectorAll('#speedButtons button[data-speed]').forEach(btn => {
+    btn.addEventListener("click", () => {
+      const sp = btn.dataset.speed;
+      tickDuration = SPEEDS[sp] || 500;
+      log(`速度を「${sp === "fast" ? "倍速" : "通常"}」に変更した。`);
+    });
+  });
+  // 1日スキップ
+  document.getElementById("skipDayBtn").addEventListener("click", () => {
+    if (isOpen) return;
+    log("1日スキップで営業を一気に進める。");
+    startDay(false);
+  });
+  // 初期化
+  function init() {
+    renderItems();
+    renderStock();
+    updateStats();
+    drawSalesChart();
+    log("ゲーム開始！ まずは仕入れをして、次の日を始めてみよう。");
+  }
+  document.getElementById("nextDayBtn").addEventListener("click", () => {
+    if (!isOpen) startDay(true);
+  });
+</script>
+</body>
+</html>
+
