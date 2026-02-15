@@ -1,0 +1,904 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="UTF-8">
+<title>カジノポーカー完全版</title>
+<style>
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    background: #064420;
+    color: white;
+    font-family: sans-serif;
+    text-align: center;
+    overflow: hidden;
+  }
+  .hidden { display: none; }
+  .btn {
+    display: inline-block;
+    padding: 8px 18px;
+    margin: 6px;
+    background: #d4af37;
+    color: black;
+    border-radius: 10px;
+    font-size: 15px;
+    cursor: pointer;
+  }
+  /* 画面サイズ：iPad風 */
+  .screen {
+    width: 1024px;
+    height: 768px;
+    position: absolute;
+    top: 50%; left: 50%;
+    transform: translate(-50%, -50%);
+    border: 4px solid #222;
+    box-shadow: 0 0 30px rgba(0,0,0,0.8);
+    background: #064420;
+  }
+  /* コイン表示（ゲーム全体の通貨） */
+  #coinDisplay {
+    position: absolute;
+    top: 8px;
+    right: 8px;
+    background: rgba(0,0,0,0.6);
+    padding: 4px 10px;
+    border-radius: 15px;
+    border: 2px solid gold;
+    color: gold;
+    font-size: 14px;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    z-index: 200;
+  }
+  .coinIcon {
+    width: 18px;
+    height: 18px;
+    background: radial-gradient(circle, gold 40%, #b8860b 80%);
+    border-radius: 50%;
+    box-shadow: 0 0 10px gold;
+  }
+  /* タイトル画面 */
+  #titleScreen {
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    align-items: center;
+  }
+  /* モーダル（遊び方・ショップ） */
+  .modal {
+    position: absolute;
+    top: 50%; left: 50%;
+    transform: translate(-50%, -50%);
+    background: rgba(0,0,0,0.9);
+    border: 3px solid gold;
+    border-radius: 15px;
+    padding: 16px;
+    width: 380px;
+    max-width: 90%;
+    z-index: 50;
+    font-size: 13px;
+  }
+  .shopItem {
+    background: #222;
+    padding: 8px;
+    margin: 6px 0;
+    border-radius: 10px;
+    border: 2px solid gold;
+    text-align: left;
+  }
+  /* タップエリア */
+  #tapAreaScreen {
+    background: #000;
+  }
+  #tapCoinImg {
+    width: 150px;
+    height: 150px;
+    background: radial-gradient(circle, gold 40%, #b8860b 80%);
+    border-radius: 50%;
+    box-shadow: 0 0 30px gold;
+    cursor: pointer;
+    transition: transform 0.1s;
+    position: absolute;
+    top: 50%; left: 50%;
+    transform: translate(-50%, -50%);
+  }
+  .tapEffect {
+    position: absolute;
+    color: gold;
+    font-size: 22px;
+    animation: floatUp 0.8s ease-out forwards;
+    pointer-events: none;
+  }
+  @keyframes floatUp {
+    0% { opacity: 1; transform: translateY(0); }
+    100% { opacity: 0; transform: translateY(-60px); }
+  }
+  /* ポーカー画面 */
+  #pokerScreen {
+    background: #064420;
+  }
+  /* テーブル（全色対応） */
+  #table {
+    position: absolute;
+    top: 50%; left: 50%;
+    width: 780px;
+    height: 500px;
+    margin-left: -390px;
+    margin-top: -250px;
+    border: 12px solid #d4af37;
+    border-radius: 50%;
+    box-shadow: 0 0 30px rgba(0,0,0,0.7);
+  }
+  .table-green { background: #0a5a2c; }
+  .table-black { background: #111; }
+  .table-red { background: #7a1010; }
+  .table-blue { background: #103a7a; }
+  .table-purple { background: #4b1a6b; }
+  .table-gold { background: #b8860b; }
+  /* プレイヤー配置 */
+  .playerArea {
+    position: absolute;
+    width: 200px;
+    text-align: center;
+  }
+  #cpu1 { top: 40px; left: 50%; margin-left: -100px; }
+  #cpu2 { top: 170px; left: 80px; }
+  #cpu3 { top: 170px; right: 80px; }
+  #player { bottom: 90px; left: 50%; margin-left: -100px; }
+  .nameLabel {
+    margin-bottom: 4px;
+    font-weight: bold;
+    font-size: 13px;
+  }
+  .moneyLabel {
+    font-size: 11px;
+    margin-bottom: 2px;
+  }
+  .cardRow {
+    display: flex;
+    justify-content: center;
+  }
+  /* カード（スキン対応） */
+  .card {
+    width: 50px;
+    height: 75px;
+    background: white;
+    border-radius: 8px;
+    margin: 3px;
+    line-height: 75px;
+    font-size: 17px;
+    color: black;
+    box-shadow: 0 0 8px rgba(0,0,0,0.5);
+    position: relative;
+    transition: transform 0.2s, box-shadow 0.2s;
+  }
+  .card.back {
+    background: #222;
+    color: #222;
+  }
+  /* カードスキン */
+  .skin-red { background: #b00020; color: #fff; }
+  .skin-blue { background: #0044aa; color: #fff; }
+  .skin-black { background: #111; color: #fff; }
+  .skin-gold { background: linear-gradient(135deg, #f7e27b, #c9a635); color: #000; }
+  .skin-white { background: #f5f5f5; color: #000; }
+  .skin-fire { background: linear-gradient(135deg, #ff9800, #b71c1c); color: #fff; }
+  .skin-cyber { background: linear-gradient(135deg, #00e5ff, #1a237e); color: #fff; }
+  .card.playerCard:hover {
+    transform: translateY(-4px);
+    box-shadow: 0 0 12px rgba(255,255,255,0.7);
+    cursor: pointer;
+  }
+  .card.hold {
+    border: 2px solid red;
+    box-shadow: 0 0 15px red;
+  }
+  .dealAnim {
+    animation: deal 0.25s ease-out;
+  }
+  @keyframes deal {
+    0% { transform: translateY(-30px) scale(0.5); opacity: 0; }
+    100% { transform: translateY(0) scale(1); opacity: 1; }
+  }
+  .glowAnim {
+    animation: glow 1s infinite alternate;
+  }
+  @keyframes glow {
+    0% { box-shadow: 0 0 4px rgba(255,255,255,0.3); }
+    100% { box-shadow: 0 0 16px rgba(255,255,255,0.9); }
+  }
+  /* テキサスのコミュニティカード */
+  #communityRow {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    display: flex;
+  }
+  /* ポーカー操作ボタン */
+  #pokerControls {
+    position: absolute;
+    bottom: 10px;
+    left: 50%;
+    transform: translateX(-50%);
+    width: 700px;
+  }
+  /* 情報表示 */
+  #pokerInfo {
+    position: absolute;
+    top: 10px;
+    left: 10px;
+    text-align: left;
+    font-size: 12px;
+  }
+  /* 勝利メッセージ（中央より少し上） */
+  #pokerResult {
+    position: absolute;
+    top: 58%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    font-size: 14px;
+    white-space: pre-line;
+    max-width: 80%;
+  }
+  /* CPUアクションログ（最大3行） */
+  #actionLog {
+    position: absolute;
+    top: 42%;
+    left: 50%;
+    transform: translateX(-50%);
+    width: 400px;
+    font-size: 14px;
+    text-align: center;
+    white-space: pre-line;
+  }
+</style>
+</head>
+<body>
+<!-- コイン表示 -->
+<div id="coinDisplay">
+  <div class="coinIcon"></div>
+  <span id="coinAmount">500</span>
+</div>
+<!-- タイトル画面 -->
+<div id="titleScreen" class="screen">
+  <h1>🎰 カジノポーカー 🎰</h1>
+  <div class="btn" onclick="openHowTo()">遊び方</div>
+  <div class="btn" onclick="openModeSelect()">ポーカーを遊ぶ</div>
+  <div class="btn" onclick="openShop()">ショップ</div>
+  <div id="tapBtn" class="btn hidden" onclick="openTapArea()">タップエリア</div>
+</div>
+<!-- 遊び方 -->
+<div id="howToModal" class="modal hidden">
+  <h2>遊び方</h2>
+  <p>・5カードドロー または テキサスホールデムを選んで遊びます。</p>
+  <p>・あなた＋CPU3人の4人対戦です。</p>
+  <p>・5カードドロー：5枚配られ、ホールドしたカード以外を1回だけ交換できます。</p>
+  <p>・テキサスホールデム：2枚の手札＋場の5枚から最強の役を作ります。</p>
+  <p>【役一覧（強い順）】</p>
+  <p>
+    10. ロイヤルストレートフラッシュ<br>
+    9. ストレートフラッシュ<br>
+    8. フォーカード<br>
+    7. フルハウス<br>
+    6. フラッシュ<br>
+    5. ストレート<br>
+    4. スリーカード<br>
+    3. ツーペア<br>
+    2. ワンペア<br>
+    1. ノーペア
+  </p>
+  <p>・勝つとポット分のコインが増えます。CPUもコインを持って賭けます。</p>
+  <div class="btn" onclick="closeHowTo()">閉じる</div>
+</div>
+<!-- モード選択 -->
+<div id="modeModal" class="modal hidden">
+  <h2>ゲームモードを選択</h2>
+  <div class="btn" onclick="startPoker('draw')">5カードドロー</div>
+  <div class="btn" onclick="startPoker('texas')">テキサスホールデム</div>
+  <div class="btn" onclick="closeModeSelect()">キャンセル</div>
+</div>
+<!-- ショップ -->
+<div id="shopModal" class="modal hidden">
+  <h2>ショップ</h2>
+  <div class="shopItem">
+    <strong>タップエリア解放</strong><br>
+    価格：500コイン
+    <div class="btn" onclick="buyItem('tap')">購入</div>
+  </div>
+  <div class="shopItem">
+    <strong>カードスキン</strong><br>
+    赤 / 青 / 黒 / 金 / 白 / 炎 / サイバー
+    <div class="btn" onclick="buyItem('skin-red')">赤（200）</div>
+    <div class="btn" onclick="buyItem('skin-blue')">青（200）</div>
+    <div class="btn" onclick="buyItem('skin-black')">黒（200）</div>
+    <div class="btn" onclick="buyItem('skin-gold')">金（300）</div>
+    <div class="btn" onclick="buyItem('skin-white')">白（200）</div>
+    <div class="btn" onclick="buyItem('skin-fire')">炎（300）</div>
+    <div class="btn" onclick="buyItem('skin-cyber')">サイバー（300）</div>
+  </div>
+  <div class="shopItem">
+    <strong>テーブルカラー</strong><br>
+    緑 / 黒 / 赤 / 青 / 紫 / 金
+    <div class="btn" onclick="buyItem('table-green')">緑（100）</div>
+    <div class="btn" onclick="buyItem('table-black')">黒（150）</div>
+    <div class="btn" onclick="buyItem('table-red')">赤（150）</div>
+    <div class="btn" onclick="buyItem('table-blue')">青（150）</div>
+    <div class="btn" onclick="buyItem('table-purple')">紫（150）</div>
+    <div class="btn" onclick="buyItem('table-gold')">金（200）</div>
+  </div>
+  <div class="shopItem">
+    <strong>アニメーション強化</strong><br>
+    カードが光る演出が追加されます。<br>
+    価格：400コイン
+    <div class="btn" onclick="buyItem('anim')">購入</div>
+  </div>
+  <div class="btn" onclick="closeShop()">閉じる</div>
+</div>
+<!-- タップエリア -->
+<div id="tapAreaScreen" class="screen hidden">
+  <div id="tapCoinImg" onclick="tapCoin()"></div>
+  <div class="btn" style="position:absolute; bottom:20px; left:50%; transform:translateX(-50%);" onclick="closeTapArea()">戻る</div>
+</div>
+<!-- ポーカー画面 -->
+<div id="pokerScreen" class="screen hidden">
+  <div id="table" class="table-green"></div>
+  <div id="pokerInfo">
+    <div>モード: <span id="modeLabel"></span></div>
+    <div>ポット: <span id="potAmount">0</span></div>
+    <div>あなたのコイン: <span id="playerMoneyLabel">0</span></div>
+    <div>CPU1: <span id="cpu1MoneyLabel">0</span></div>
+    <div>CPU2: <span id="cpu2MoneyLabel">0</span></div>
+    <div>CPU3: <span id="cpu3MoneyLabel">0</span></div>
+  </div>
+  <!-- CPUアクションログ -->
+  <div id="actionLog"></div>
+  <!-- テキサスのコミュニティカード -->
+  <div id="communityRow"></div>
+  <!-- CPU1 -->
+  <div id="cpu1" class="playerArea">
+    <div class="nameLabel">CPU1</div>
+    <div class="moneyLabel" id="cpu1MoneySmall"></div>
+    <div class="cardRow" id="cpu1Cards"></div>
+  </div>
+  <!-- CPU2 -->
+  <div id="cpu2" class="playerArea">
+    <div class="nameLabel">CPU2</div>
+    <div class="moneyLabel" id="cpu2MoneySmall"></div>
+    <div class="cardRow" id="cpu2Cards"></div>
+  </div>
+  <!-- CPU3 -->
+  <div id="cpu3" class="playerArea">
+    <div class="nameLabel">CPU3</div>
+    <div class="moneyLabel" id="cpu3MoneySmall"></div>
+    <div class="cardRow" id="cpu3Cards"></div>
+  </div>
+  <!-- プレイヤー -->
+  <div id="player" class="playerArea">
+    <div class="nameLabel">あなた</div>
+    <div class="moneyLabel" id="playerMoneySmall"></div>
+    <div class="cardRow" id="playerCards"></div>
+  </div>
+  <!-- 操作ボタン -->
+  <div id="pokerControls">
+    <div class="btn" onclick="pokerCall()">コール / 次へ</div>
+    <div class="btn" onclick="pokerRaise()">レイズ</div>
+    <div class="btn" onclick="pokerFold()">フォールド</div>
+    <div id="drawBtn" class="btn" onclick="pokerDraw()">カード交換（ドローのみ）</div>
+    <div class="btn" onclick="backToTitleFromPoker()">タイトルへ戻る</div>
+  </div>
+  <!-- 勝利メッセージ -->
+  <div id="pokerResult"></div>
+</div>
+<script>
+/* ============================
+   ▼ ゲーム全体の状態
+============================ */
+let coins = 500;                 // ゲーム全体の通貨（タップ・ショップ・ポーカー共通）
+let tapUnlocked = false;
+let animUnlocked = false;
+let selectedTableClass = 'table-green';
+let selectedSkinClass = '';
+let currentMode = 'draw';        // 'draw' or 'texas'
+/* CPU とプレイヤーの所持金（coins と別管理） */
+let playerMoney = 1000;
+let cpu1Money = 1000;
+let cpu2Money = 1000;
+let cpu3Money = 1000;
+/* ポーカー用 */
+const suits = ["♠", "♥", "♦", "♣"];
+const ranks = ["A","2","3","4","5","6","7","8","9","10","J","Q","K"];
+let deck = [];
+let playerHand = [];
+let cpu1Hand = [];
+let cpu2Hand = [];
+let cpu3Hand = [];
+let communityCards = [];
+let holdFlags = [false, false, false, false, false];
+let pot = 0;
+let roundFinished = false;
+let texasStage = 0;
+/* CPU アクションログ（最大3行） */
+let actionLog = [];
+/* ============================
+   ▼ 共通 UI 更新
+============================ */
+function showScreen(id) {
+  document.getElementById("titleScreen").classList.add("hidden");
+  document.getElementById("tapAreaScreen").classList.add("hidden");
+  document.getElementById("pokerScreen").classList.add("hidden");
+  document.getElementById(id).classList.remove("hidden");
+}
+function updateCoins() {
+  document.getElementById("coinAmount").textContent = coins;
+}
+function updateMoneyLabels() {
+  document.getElementById("playerMoneyLabel").textContent = playerMoney;
+  document.getElementById("cpu1MoneyLabel").textContent = cpu1Money;
+  document.getElementById("cpu2MoneyLabel").textContent = cpu2Money;
+  document.getElementById("cpu3MoneyLabel").textContent = cpu3Money;
+  document.getElementById("playerMoneySmall").textContent = playerMoney + "コイン";
+  document.getElementById("cpu1MoneySmall").textContent = cpu1Money + "コイン";
+  document.getElementById("cpu2MoneySmall").textContent = cpu2Money + "コイン";
+  document.getElementById("cpu3MoneySmall").textContent = cpu3Money + "コイン";
+}
+/* ============================
+   ▼ モーダル
+============================ */
+function openHowTo() { document.getElementById("howToModal").classList.remove("hidden"); }
+function closeHowTo() { document.getElementById("howToModal").classList.add("hidden"); }
+function openModeSelect() { document.getElementById("modeModal").classList.remove("hidden"); }
+function closeModeSelect() { document.getElementById("modeModal").classList.add("hidden"); }
+function openShop() { document.getElementById("shopModal").classList.remove("hidden"); }
+function closeShop() { document.getElementById("shopModal").classList.add("hidden"); }
+/* ============================
+   ▼ ショップ購入
+============================ */
+function buyItem(item) {
+  let price = 0;
+  if (item === "tap") price = 500;
+  if (item === "skin-red" || item === "skin-blue" || item === "skin-black" || item === "skin-white") price = 200;
+  if (item === "skin-gold" || item === "skin-fire" || item === "skin-cyber") price = 300;
+  if (item.startsWith("table-")) {
+    if (item === "table-green") price = 100;
+    else if (item === "table-gold") price = 200;
+    else price = 150;
+  }
+  if (item === "anim") price = 400;
+  if (coins < price) {
+    alert("コインが足りません！");
+    return;
+  }
+  coins -= price;
+  updateCoins();
+  if (item === "tap") {
+    tapUnlocked = true;
+    document.getElementById("tapBtn").classList.remove("hidden");
+  } else if (item.startsWith("skin-")) {
+    selectedSkinClass = item;
+  } else if (item.startsWith("table-")) {
+    const table = document.getElementById("table");
+    table.classList.remove("table-green","table-black","table-red","table-blue","table-purple","table-gold");
+    table.classList.add(item);
+    selectedTableClass = item;
+  } else if (item === "anim") {
+    animUnlocked = true;
+  }
+  alert("購入しました！");
+}
+/* ============================
+   ▼ タップエリア
+============================ */
+function openTapArea() {
+  if (!tapUnlocked) return;
+  showScreen("tapAreaScreen");
+}
+function closeTapArea() {
+  showScreen("titleScreen");
+}
+function tapCoin() {
+  const gain = Math.floor(Math.random() * 5) + 1;
+  coins += gain;
+  updateCoins();
+  const effect = document.createElement("div");
+  effect.className = "tapEffect";
+  effect.textContent = "+" + gain;
+  const rect = document.getElementById("tapAreaScreen").getBoundingClientRect();
+  effect.style.left = (rect.left + rect.width / 2 - 10) + "px";
+  effect.style.top = (rect.top + rect.height / 2 - 40) + "px";
+  document.body.appendChild(effect);
+  setTimeout(() => effect.remove(), 800);
+  const coin = document.getElementById("tapCoinImg");
+  coin.style.transform = "translate(-50%, -50%) scale(0.9)";
+  setTimeout(() => coin.style.transform = "translate(-50%, -50%) scale(1)", 100);
+}
+/* ============================
+   ▼ デッキ生成
+============================ */
+function createDeck() {
+  const d = [];
+  for (let s of suits) {
+    for (let r of ranks) {
+      d.push({ suit: s, rank: r });
+    }
+  }
+  return d;
+}
+function shuffle(d) {
+  for (let i = d.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [d[i], d[j]] = [d[j], d[i]];
+  }
+}
+/* ============================
+   ▼ 役判定（5枚）
+============================ */
+function rankValue(r) { return ranks.indexOf(r); }
+function evaluate5(hand) {
+  const counts = {};
+  const suitsCount = {};
+  const values = [];
+  hand.forEach(card => {
+    counts[card.rank] = (counts[card.rank] || 0) + 1;
+    suitsCount[card.suit] = (suitsCount[card.suit] || 0) + 1;
+    values.push(rankValue(card.rank));
+  });
+  values.sort((a,b)=>a-b);
+  const isFlush = Object.values(suitsCount).includes(5);
+  const isStraight =
+    values.every((v,i)=> i===0 || v === values[i-1] + 1) ||
+    JSON.stringify(values) === JSON.stringify([0,1,2,3,12]);
+  const countValues = Object.values(counts);
+  if (isStraight && isFlush && values.includes(12) && values.includes(11)) return {name:"ロイヤルストレートフラッシュ", rank:10};
+  if (isStraight && isFlush) return {name:"ストレートフラッシュ", rank:9};
+  if (countValues.includes(4)) return {name:"フォーカード", rank:8};
+  if (countValues.includes(3) && countValues.includes(2)) return {name:"フルハウス", rank:7};
+  if (isFlush) return {name:"フラッシュ", rank:6};
+  if (isStraight) return {name:"ストレート", rank:5};
+  if (countValues.includes(3)) return {name:"スリーカード", rank:4};
+  if (countValues.filter(v=>v===2).length === 2) return {name:"ツーペア", rank:3};
+  if (countValues.includes(2)) return {name:"ワンペア", rank:2};
+  return {name:"ノーペア", rank:1};
+}
+/* ============================
+   ▼ テキサス：7枚から最強役
+============================ */
+function bestOf7(cards7) {
+  const idx = [0,1,2,3,4,5,6];
+  let best = {name:"ノーペア", rank:1};
+  function comb(start, chosen) {
+    if (chosen.length === 5) {
+      const hand = chosen.map(i => cards7[i]);
+      const ev = evaluate5(hand);
+      if (ev.rank > best.rank) best = ev;
+      return;
+    }
+    for (let i = start; i < idx.length; i++) {
+      chosen.push(idx[i]);
+      comb(i+1, chosen);
+      chosen.pop();
+    }
+  }
+  comb(0, []);
+  return best;
+}
+/* ============================
+   ▼ ポーカー開始
+============================ */
+function startPoker(mode) {
+  currentMode = mode;
+  document.getElementById("modeLabel").textContent =
+    mode === 'draw' ? '5カードドロー' : 'テキサスホールデム';
+  document.getElementById("modeModal").classList.add("hidden");
+  showScreen("pokerScreen");
+  startNewRound();
+}
+/* ============================
+   ▼ 新しいラウンド
+============================ */
+function startNewRound() {
+  deck = createDeck();
+  shuffle(deck);
+  playerHand = [];
+  cpu1Hand = [];
+  cpu2Hand = [];
+  cpu3Hand = [];
+  communityCards = [];
+  holdFlags = [false,false,false,false,false];
+  pot = 0;
+  roundFinished = false;
+  texasStage = 0;
+  actionLog = [];
+  updateActionLog();
+  document.getElementById("pokerResult").textContent = "";
+  document.getElementById("communityRow").innerHTML = "";
+  const ante = 50;
+  if (playerMoney < ante || cpu1Money < ante || cpu2Money < ante || cpu3Money < ante) {
+    alert("誰かのコインが足りません。タイトルに戻ります。");
+    backToTitleFromPoker();
+    return;
+  }
+  playerMoney -= ante;
+  cpu1Money -= ante;
+  cpu2Money -= ante;
+  cpu3Money -= ante;
+  pot += ante * 4;
+  document.getElementById("potAmount").textContent = pot;
+  updateMoneyLabels();
+  if (currentMode === 'draw') {
+    playerHand = deck.splice(0,5);
+    cpu1Hand = deck.splice(0,5);
+    cpu2Hand = deck.splice(0,5);
+    cpu3Hand = deck.splice(0,5);
+    document.getElementById("drawBtn").style.display = "inline-block";
+    renderHands(false);
+  } else {
+    playerHand = deck.splice(0,2);
+    cpu1Hand = deck.splice(0,2);
+    cpu2Hand = deck.splice(0,2);
+    cpu3Hand = deck.splice(0,2);
+    document.getElementById("drawBtn").style.display = "none";
+    renderHands(false);
+  }
+}
+/* ============================
+   ▼ 手札描画
+============================ */
+function renderHands(showCPU) {
+  renderHandTo("playerCards", playerHand, false, true);
+  renderHandTo("cpu1Cards", cpu1Hand, !showCPU, false);
+  renderHandTo("cpu2Cards", cpu2Hand, !showCPU, false);
+  renderHandTo("cpu3Cards", cpu3Hand, !showCPU, false);
+  if (currentMode === 'texas') {
+    const row = document.getElementById("communityRow");
+    row.innerHTML = "";
+    communityCards.forEach(card => {
+      const div = document.createElement("div");
+      div.className = "card dealAnim";
+      if (animUnlocked) div.classList.add("glowAnim");
+      if (selectedSkinClass) div.classList.add(selectedSkinClass);
+      div.textContent = card.suit + card.rank;
+      row.appendChild(div);
+    });
+  }
+}
+function renderHandTo(elemId, hand, hide, isPlayer) {
+  const row = document.getElementById(elemId);
+  row.innerHTML = "";
+  hand.forEach((card, idx) => {
+    const div = document.createElement("div");
+    div.className = "card dealAnim";
+    if (animUnlocked) div.classList.add("glowAnim");
+    if (selectedSkinClass && hide) div.classList.add(selectedSkinClass);
+    if (hide) div.classList.add("back");
+    if (isPlayer && currentMode === 'draw') {
+      div.classList.add("playerCard");
+      if (holdFlags[idx]) div.classList.add("hold");
+      div.onclick = () => {
+        if (roundFinished) return;
+        holdFlags[idx] = !holdFlags[idx];
+        renderHands(false);
+      };
+    }
+    if (!hide) {
+      if (selectedSkinClass) div.classList.add(selectedSkinClass);
+      div.textContent = card.suit + card.rank;
+    } else {
+      div.textContent = "🂠";
+    }
+    row.appendChild(div);
+  });
+}
+/* ============================
+   ▼ CPU アクションログ
+============================ */
+function updateActionLog() {
+  const logBox = document.getElementById("actionLog");
+  logBox.textContent = actionLog.join("\n");
+}
+function pushLog(text) {
+  actionLog.push(text);
+  if (actionLog.length > 3) actionLog.shift();
+  updateActionLog();
+}
+/* ============================
+   ▼ CPU ベット判断
+============================ */
+function cpuBetDecision(evRank, money) {
+  if (money <= 0) return 0;
+  if (evRank >= 7) return 150;  // 強い → レイズ
+  if (evRank >= 5) return 100;  // そこそこ → コール
+  if (evRank >= 3) return 50;   // 弱め → 小コール
+  return Math.random() < 0.2 ? 50 : 0; // 20%でコール
+}
+/* ============================
+   ▼ CPU アクション（時計回り）
+============================ */
+function cpuAct(name, hand, moneyRef) {
+  const ev = currentMode === 'draw'
+    ? evaluate5(hand)
+    : bestOf7(hand.concat(communityCards));
+  const bet = cpuBetDecision(ev.rank, moneyRef.value);
+  if (bet === 0) {
+    pushLog(`${name} はフォールドした`);
+    return {action:"fold", bet:0};
+  }
+  moneyRef.value -= bet;
+  pot += bet;
+  document.getElementById("potAmount").textContent = pot;
+  if (bet >= 100) {
+    pushLog(`${name} はレイズした（+${bet}）`);
+    return {action:"raise", bet};
+  } else {
+    pushLog(`${name} はコールした（+${bet}）`);
+    return {action:"call", bet};
+  }
+}
+/* ============================
+   ▼ コール（あなた）
+============================ */
+function pokerCall() {
+  if (roundFinished) {
+    startNewRound();
+    return;
+  }
+  pushLog("あなたはコールした");
+  /* CPU1 → CPU2 → CPU3 */
+  cpuAct("CPU1", cpu1Hand, {value: cpu1Money});
+  cpuAct("CPU2", cpu2Hand, {value: cpu2Money});
+  cpuAct("CPU3", cpu3Hand, {value: cpu3Money});
+  updateMoneyLabels();
+  if (currentMode === 'draw') {
+    finishRound(false);
+    return;
+  }
+  /* テキサス：ステージ進行 */
+  if (texasStage === 0) {
+    communityCards = communityCards.concat(deck.splice(0,3));
+    texasStage = 1;
+    renderHands(false);
+  } else if (texasStage === 1) {
+    communityCards = communityCards.concat(deck.splice(0,1));
+    texasStage = 2;
+    renderHands(false);
+  } else if (texasStage === 2) {
+    communityCards = communityCards.concat(deck.splice(0,1));
+    texasStage = 3;
+    renderHands(false);
+  } else if (texasStage === 3) {
+    finishRound(true);
+  }
+}
+/* ============================
+   ▼ レイズ
+============================ */
+function pokerRaise() {
+  if (roundFinished) return;
+  const raiseAmount = 100;
+  if (playerMoney < raiseAmount) {
+    alert("あなたのコインが足りません");
+    return;
+  }
+  playerMoney -= raiseAmount;
+  pot += raiseAmount;
+  updateMoneyLabels();
+  document.getElementById("potAmount").textContent = pot;
+  pushLog(`あなたはレイズした（+${raiseAmount}）`);
+  /* CPU も反応 */
+  cpuAct("CPU1", cpu1Hand, {value: cpu1Money});
+  cpuAct("CPU2", cpu2Hand, {value: cpu2Money});
+  cpuAct("CPU3", cpu3Hand, {value: cpu3Money});
+  updateMoneyLabels();
+}
+/* ============================
+   ▼ フォールド
+============================ */
+function pokerFold() {
+  if (roundFinished) {
+    startNewRound();
+    return;
+  }
+  roundFinished = true;
+  document.getElementById("pokerResult").textContent =
+    "フォールドしました。\nCPUの勝ち。\nコイン増減: 0";
+}
+/* ============================
+   ▼ ドロー交換（続き）
+============================ */
+function pokerDraw() {
+  if (roundFinished || currentMode !== 'draw') return;
+  // プレイヤー交換
+  for (let i = 0; i < 5; i++) {
+    if (!holdFlags[i]) {
+      playerHand[i] = deck.shift();
+    }
+  }
+  // CPU交換（簡易AI）
+  cpuDraw(cpu1Hand);
+  cpuDraw(cpu2Hand);
+  cpuDraw(cpu3Hand);
+  finishRound(true);
+}
+/* CPUのドローAI（弱い手なら2枚交換） */
+function cpuDraw(hand) {
+  const ev = evaluate5(hand);
+  if (ev.rank <= 1) {
+    // ランダムに2枚交換
+    hand[0] = deck.shift();
+    hand[1] = deck.shift();
+  }
+}
+/* ============================
+   ▼ ラウンド終了処理
+============================ */
+function finishRound(showAll) {
+  roundFinished = true;
+  // CPUの手札を公開
+  renderHands(true);
+  let pEval, c1Eval, c2Eval, c3Eval;
+  if (currentMode === 'draw') {
+    pEval = evaluate5(playerHand);
+    c1Eval = evaluate5(cpu1Hand);
+    c2Eval = evaluate5(cpu2Hand);
+    c3Eval = evaluate5(cpu3Hand);
+  } else {
+    pEval = bestOf7(playerHand.concat(communityCards));
+    c1Eval = bestOf7(cpu1Hand.concat(communityCards));
+    c2Eval = bestOf7(cpu2Hand.concat(communityCards));
+    c3Eval = bestOf7(cpu3Hand.concat(communityCards));
+  }
+  const results = [
+    {name:"あなた", eval:pEval},
+    {name:"CPU1", eval:c1Eval},
+    {name:"CPU2", eval:c2Eval},
+    {name:"CPU3", eval:c3Eval},
+  ];
+  // 強い順に並べる
+  results.sort((a,b)=>b.eval.rank - a.eval.rank);
+  const top = results[0];
+  const second = results[1];
+  let msg =
+    `あなた: ${pEval.name}\n` +
+    `CPU1: ${c1Eval.name}\n` +
+    `CPU2: ${c2Eval.name}\n` +
+    `CPU3: ${c3Eval.name}\n\n`;
+  let coinChange = 0;
+  if (top.eval.rank === second.eval.rank) {
+    msg += "結果: 引き分け！ポットは全員に戻ります。\n";
+    const back = Math.floor(pot / 4);
+    playerMoney += back;
+    cpu1Money += back;
+    cpu2Money += back;
+    cpu3Money += back;
+  } else {
+    msg += `結果: ${top.name} の勝ち！\n`;
+    if (top.name === "あなた") {
+      playerMoney += pot;
+      coinChange = pot;
+    } else if (top.name === "CPU1") {
+      cpu1Money += pot;
+    } else if (top.name === "CPU2") {
+      cpu2Money += pot;
+    } else if (top.name === "CPU3") {
+      cpu3Money += pot;
+    }
+  }
+  msg += `コイン増減: +${coinChange}`;
+  document.getElementById("pokerResult").textContent = msg;
+  updateMoneyLabels();
+}
+/* ============================
+   ▼ タイトルへ戻る
+============================ */
+function backToTitleFromPoker() {
+  showScreen("titleScreen");
+}
+/* ============================
+   ▼ 初期化
+============================ */
+updateCoins();
+updateMoneyLabels();
+</script>
+</html>
+
